@@ -1,0 +1,258 @@
+{
+  "totalDuration": 474.57599999999996,
+  "totalDurationFormatted": "7:54",
+  "scenes": [
+    {
+      "index": 0,
+      "file": "scene_00.mp3",
+      "duration": 13800,
+      "durationSeconds": 13.8
+    },
+    {
+      "index": 1,
+      "file": "scene_01.mp3",
+      "duration": 11280,
+      "durationSeconds": 11.28
+    },
+    {
+      "index": 2,
+      "file": "scene_02.mp3",
+      "duration": 11520,
+      "durationSeconds": 11.52
+    },
+    {
+      "index": 3,
+      "file": "scene_03.mp3",
+      "duration": 10848,
+      "durationSeconds": 10.848
+    },
+    {
+      "index": 4,
+      "file": "scene_04.mp3",
+      "duration": 11016,
+      "durationSeconds": 11.016
+    },
+    {
+      "index": 5,
+      "file": "scene_05.mp3",
+      "duration": 9024,
+      "durationSeconds": 9.024
+    },
+    {
+      "index": 6,
+      "file": "scene_06.mp3",
+      "duration": 13080,
+      "durationSeconds": 13.08
+    },
+    {
+      "index": 7,
+      "file": "scene_07.mp3",
+      "duration": 10896,
+      "durationSeconds": 10.896
+    },
+    {
+      "index": 8,
+      "file": "scene_08.mp3",
+      "duration": 10296,
+      "durationSeconds": 10.296
+    },
+    {
+      "index": 9,
+      "file": "scene_09.mp3",
+      "duration": 11616,
+      "durationSeconds": 11.616
+    },
+    {
+      "index": 10,
+      "file": "scene_10.mp3",
+      "duration": 9624,
+      "durationSeconds": 9.624
+    },
+    {
+      "index": 11,
+      "file": "scene_11.mp3",
+      "duration": 12744,
+      "durationSeconds": 12.744
+    },
+    {
+      "index": 12,
+      "file": "scene_12.mp3",
+      "duration": 11688,
+      "durationSeconds": 11.688
+    },
+    {
+      "index": 13,
+      "file": "scene_13.mp3",
+      "duration": 11664,
+      "durationSeconds": 11.664
+    },
+    {
+      "index": 14,
+      "file": "scene_14.mp3",
+      "duration": 10776,
+      "durationSeconds": 10.776
+    },
+    {
+      "index": 15,
+      "file": "scene_15.mp3",
+      "duration": 12504,
+      "durationSeconds": 12.504
+    },
+    {
+      "index": 16,
+      "file": "scene_16.mp3",
+      "duration": 11040,
+      "durationSeconds": 11.04
+    },
+    {
+      "index": 17,
+      "file": "scene_17.mp3",
+      "duration": 13416,
+      "durationSeconds": 13.416
+    },
+    {
+      "index": 18,
+      "file": "scene_18.mp3",
+      "duration": 11808,
+      "durationSeconds": 11.808
+    },
+    {
+      "index": 19,
+      "file": "scene_19.mp3",
+      "duration": 12216,
+      "durationSeconds": 12.216
+    },
+    {
+      "index": 20,
+      "file": "scene_20.mp3",
+      "duration": 12432,
+      "durationSeconds": 12.432
+    },
+    {
+      "index": 21,
+      "file": "scene_21.mp3",
+      "duration": 11400,
+      "durationSeconds": 11.4
+    },
+    {
+      "index": 22,
+      "file": "scene_22.mp3",
+      "duration": 10920,
+      "durationSeconds": 10.92
+    },
+    {
+      "index": 23,
+      "file": "scene_23.mp3",
+      "duration": 10920,
+      "durationSeconds": 10.92
+    },
+    {
+      "index": 24,
+      "file": "scene_24.mp3",
+      "duration": 13752,
+      "durationSeconds": 13.752
+    },
+    {
+      "index": 25,
+      "file": "scene_25.mp3",
+      "duration": 12312,
+      "durationSeconds": 12.312
+    },
+    {
+      "index": 26,
+      "file": "scene_26.mp3",
+      "duration": 11064,
+      "durationSeconds": 11.064
+    },
+    {
+      "index": 27,
+      "file": "scene_27.mp3",
+      "duration": 14040,
+      "durationSeconds": 14.04
+    },
+    {
+      "index": 28,
+      "file": "scene_28.mp3",
+      "duration": 10608,
+      "durationSeconds": 10.608
+    },
+    {
+      "index": 29,
+      "file": "scene_29.mp3",
+      "duration": 12600,
+      "durationSeconds": 12.6
+    },
+    {
+      "index": 30,
+      "file": "scene_30.mp3",
+      "duration": 10608,
+      "durationSeconds": 10.608
+    },
+    {
+      "index": 31,
+      "file": "scene_31.mp3",
+      "duration": 12144,
+      "durationSeconds": 12.144
+    },
+    {
+      "index": 32,
+      "file": "scene_32.mp3",
+      "duration": 10392,
+      "durationSeconds": 10.392
+    },
+    {
+      "index": 33,
+      "file": "scene_33.mp3",
+      "duration": 8352,
+      "durationSeconds": 8.352
+    },
+    {
+      "index": 34,
+      "file": "scene_34.mp3",
+      "duration": 9384,
+      "durationSeconds": 9.384
+    },
+    {
+      "index": 35,
+      "file": "scene_35.mp3",
+      "duration": 10008,
+      "durationSeconds": 10.008
+    },
+    {
+      "index": 36,
+      "file": "scene_36.mp3",
+      "duration": 8640,
+      "durationSeconds": 8.64
+    },
+    {
+      "index": 37,
+      "file": "scene_37.mp3",
+      "duration": 12984,
+      "durationSeconds": 12.984
+    },
+    {
+      "index": 38,
+      "file": "scene_38.mp3",
+      "duration": 10008,
+      "durationSeconds": 10.008
+    },
+    {
+      "index": 39,
+      "file": "scene_39.mp3",
+      "duration": 2928,
+      "durationSeconds": 2.928
+    },
+    {
+      "index": 40,
+      "file": "scene_40.mp3",
+      "duration": 12024,
+      "durationSeconds": 12.024
+    },
+    {
+      "index": 41,
+      "file": "scene_41.mp3",
+      "duration": 16200,
+      "durationSeconds": 16.2
+    }
+  ]
+}

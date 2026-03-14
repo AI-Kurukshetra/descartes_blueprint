@@ -6,21 +6,27 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  reporter: 'html',
+  reporter: [['html'], ['list']],
 
   use: {
     // Base URL for the app
     baseURL: process.env.DEMO_URL || 'https://tradeguard-two.vercel.app',
 
-    // Record video for all tests
+    // Record video for all tests - full screen
     video: {
       mode: 'on',
       size: { width: 1920, height: 1080 }
     },
 
-    // Fast actions but longer pauses for viewing
+    // Minimal slowMo - timing controlled by audio durations
     launchOptions: {
-      slowMo: 200,
+      slowMo: 50,
+      args: [
+        '--start-fullscreen',
+        '--kiosk',
+        '--disable-infobars',
+        '--hide-scrollbars',
+      ],
     },
 
     // Take screenshot on failure
@@ -29,7 +35,7 @@ export default defineConfig({
     // Record trace
     trace: 'on',
 
-    // Viewport
+    // Viewport - full HD
     viewport: { width: 1920, height: 1080 },
   },
 
@@ -39,6 +45,11 @@ export default defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         channel: 'chrome',
+        // Override to ensure no device emulation interferes
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
       },
     },
   ],
