@@ -89,7 +89,8 @@ CREATE TABLE IF NOT EXISTS exchange_rates (
   rate DECIMAL NOT NULL,
   source TEXT DEFAULT 'api', -- 'api', 'manual'
   fetched_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(base_currency, target_currency, fetched_at::DATE)
+  rate_date DATE DEFAULT CURRENT_DATE,
+  UNIQUE(base_currency, target_currency, rate_date)
 );
 
 -- ============================================================================
