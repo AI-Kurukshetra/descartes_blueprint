@@ -53,8 +53,8 @@ export const dutyCalculateSchema = z.object({
   hs_code: z.string().min(4, "HS code is required"),
   product_description: z.string().optional(),
   declared_value: z.number().positive("Declared value must be positive"),
-  currency: z.string().default("USD"),
-  quantity: z.number().positive("Quantity must be positive").default(1),
+  currency: z.string().min(1, "Currency is required"),
+  quantity: z.number().positive("Quantity must be positive"),
   weight_kg: z.number().positive("Weight must be positive"),
   incoterm: z.string().min(1, "Incoterm is required"),
 })
