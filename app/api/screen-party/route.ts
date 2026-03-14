@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
+import {
+  checkRateLimit,
+  getClientIdentifier,
+  createRateLimitHeaders,
+  RATE_LIMITS,
+} from "@/lib/rate-limit"
 
 const requestSchema = z.object({
   party_name: z.string().min(2),
@@ -74,6 +80,18 @@ function fuzzyMatch(searchName: string, targetName: string): number {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting (20 requests per minute)
+    const clientId = `screen:${getClientIdentifier(request)}`
+    const rateLimitResult = checkRateLimit(clientId, RATE_LIMITS.partyScreening)
+
+    if (!rateLimitResult.success) {
+      const headers = createRateLimitHeaders(rateLimitResult)
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again in a minute." },
+        { status: 429, headers }
+      )
+    }
+
     const body = await request.json()
     const validatedData = requestSchema.safeParse(body)
 

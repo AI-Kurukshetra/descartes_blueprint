@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import OpenAI from "openai"
 import { z } from "zod"
+import {
+  checkRateLimit,
+  getClientIdentifier,
+  createRateLimitHeaders,
+  RATE_LIMITS,
+} from "@/lib/rate-limit"
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -12,28 +18,6 @@ const requestSchema = z.object({
   productName: z.string().optional(),
   intendedUse: z.string().optional(),
 })
-
-// Simple in-memory rate limiting
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
-const RATE_LIMIT = 10
-const RATE_WINDOW = 60 * 1000 // 1 minute
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
-
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_WINDOW })
-    return true
-  }
-
-  if (record.count >= RATE_LIMIT) {
-    return false
-  }
-
-  record.count++
-  return true
-}
 
 const systemPrompt = `You are an expert customs classifier with deep knowledge of the Harmonized System (HS) nomenclature used in international trade.
 
@@ -57,16 +41,15 @@ Important guidelines:
 
 export async function POST(request: NextRequest) {
   try {
-    // Get IP for rate limiting
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0] ||
-      request.headers.get("x-real-ip") ||
-      "unknown"
+    // Rate limiting (10 requests per minute as specified)
+    const clientId = `hs:${getClientIdentifier(request)}`
+    const rateLimitResult = checkRateLimit(clientId, RATE_LIMITS.hsClassification)
 
-    if (!checkRateLimit(ip)) {
+    if (!rateLimitResult.success) {
+      const headers = createRateLimitHeaders(rateLimitResult)
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again in a minute." },
-        { status: 429 }
+        { status: 429, headers }
       )
     }
 
