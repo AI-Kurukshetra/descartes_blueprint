@@ -48,3 +48,7 @@ VIDEO_AND_PH_KIT.md
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+demo/videos/
+demo/output/*.mp4
+demo/audio/
+playwright-report/

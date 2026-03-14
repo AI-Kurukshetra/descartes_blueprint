@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test'
+import { test, Page } from '@playwright/test'
 import * as fs from 'fs'
 import * as path from 'path'
 
@@ -36,28 +36,50 @@ function getSceneDuration(): number {
   return duration
 }
 
-// Wait for the exact audio duration
+// Wait for the exact audio duration - with error handling
 async function waitForAudio(page: Page, extraMs: number = 500) {
-  const duration = getSceneDuration() + extraMs // Add small buffer for transitions
-  await page.waitForTimeout(duration)
+  try {
+    const duration = getSceneDuration() + extraMs
+    await page.waitForTimeout(duration)
+  } catch {
+    // Page closed, ignore
+  }
 }
 
 // Helper to scroll slowly for effect
 async function slowScroll(page: Page, pixels: number = 300) {
-  await page.evaluate((px) => {
-    window.scrollBy({ top: px, behavior: 'smooth' })
-  }, pixels)
-  await page.waitForTimeout(800)
+  try {
+    await page.evaluate((px) => {
+      window.scrollBy({ top: px, behavior: 'smooth' })
+    }, pixels)
+    await page.waitForTimeout(800)
+  } catch {
+    // Page closed, ignore
+  }
 }
 
 // Helper to highlight element before clicking
 async function highlightAndClick(page: Page, selector: string) {
-  const element = page.locator(selector).first()
-  if (await element.isVisible()) {
-    await element.hover()
-    await page.waitForTimeout(300)
-    await element.click()
+  try {
+    const element = page.locator(selector).first()
+    if (await element.isVisible()) {
+      await element.hover()
+      await page.waitForTimeout(300)
+      await element.click()
+    }
+  } catch {
+    // Element not found or page closed, ignore
   }
+}
+
+// Safe page wait
+async function safeWait(page: Page, selector: string, timeout: number = 10000) {
+  try {
+    await page.waitForSelector(selector, { timeout })
+  } catch {
+    // Continue regardless
+  }
+  await page.waitForTimeout(500)
 }
 
 test.describe('TradeGuard Demo - Synced with Voiceover', () => {
@@ -71,7 +93,7 @@ test.describe('TradeGuard Demo - Synced with Voiceover', () => {
     // ==========================================
     console.log('📍 Scene 0: Introduction')
     await page.goto('/')
-    await page.waitForTimeout(1000) // Wait for page load
+    await page.waitForTimeout(1000)
     await waitForAudio(page)
 
     // ==========================================
@@ -85,7 +107,7 @@ test.describe('TradeGuard Demo - Synced with Voiceover', () => {
     // SCENE 2: Secure Authentication
     // ==========================================
     console.log('📍 Scene 2: Secure Authentication')
-    await page.click('text=Sign In')
+    await page.click('text=Sign In').catch(() => {})
     await page.waitForTimeout(500)
     await waitForAudio(page)
 
@@ -93,24 +115,24 @@ test.describe('TradeGuard Demo - Synced with Voiceover', () => {
     // SCENE 3: Login Credentials
     // ==========================================
     console.log('📍 Scene 3: Login Credentials')
-    await page.fill('input[type="email"]', 'admin@tradeguard.com')
+    await page.fill('input[type="email"]', 'admin@tradeguard.com').catch(() => {})
     await page.waitForTimeout(800)
-    await page.fill('input[type="password"]', 'Password123!')
+    await page.fill('input[type="password"]', 'Password123!').catch(() => {})
     await waitForAudio(page)
 
     // ==========================================
     // SCENE 4: Role-Based Access
     // ==========================================
     console.log('📍 Scene 4: Role-Based Access')
-    await page.click('button[type="submit"]')
-    await page.waitForURL('**/dashboard**', { timeout: 20000 })
+    await page.click('button[type="submit"]').catch(() => {})
+    await page.waitForURL('**/dashboard**', { timeout: 30000 }).catch(() => {})
     await waitForAudio(page)
 
     // ==========================================
     // SCENE 5: Dashboard Overview
     // ==========================================
     console.log('📍 Scene 5: Dashboard Overview')
-    await page.waitForTimeout(500)
+    await page.waitForTimeout(1000)
     await waitForAudio(page)
 
     // ==========================================
@@ -144,7 +166,7 @@ test.describe('TradeGuard Demo - Synced with Voiceover', () => {
     // ==========================================
     console.log('📍 Scene 10: Shipments Module')
     await highlightAndClick(page, 'text=Shipments')
-    await page.waitForSelector('h1:has-text("Shipments")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("Shipments")')
     await waitForAudio(page)
 
     // ==========================================
@@ -177,7 +199,7 @@ test.describe('TradeGuard Demo - Synced with Voiceover', () => {
     // ==========================================
     console.log('📍 Scene 15: AI-Powered HS Classifier')
     await highlightAndClick(page, 'text=HS Classifier')
-    await page.waitForSelector('h1:has-text("HS Code")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("HS Code")')
     await waitForAudio(page)
 
     // ==========================================
@@ -196,11 +218,14 @@ Outer diameter: 50mm, Wall thickness: 3mm
 Length: 6 meters, Surface finish: Polished
 Manufactured in India for export to European Union`
 
-    const textarea = page.locator('textarea').first()
-    if (await textarea.isVisible()) {
-      // Type slowly for visual effect
-      await textarea.click()
-      await page.keyboard.type(productDescription, { delay: 20 })
+    try {
+      const textarea = page.locator('textarea').first()
+      if (await textarea.isVisible()) {
+        await textarea.click()
+        await page.keyboard.type(productDescription, { delay: 20 })
+      }
+    } catch {
+      // Continue
     }
     await waitForAudio(page)
 
@@ -208,9 +233,13 @@ Manufactured in India for export to European Union`
     // SCENE 18: AI Classification Process
     // ==========================================
     console.log('📍 Scene 18: AI Classification Process')
-    const classifyButton = page.locator('button:has-text("Classify")').first()
-    if (await classifyButton.isVisible()) {
-      await classifyButton.click()
+    try {
+      const classifyButton = page.locator('button:has-text("Classify")').first()
+      if (await classifyButton.isVisible()) {
+        await classifyButton.click()
+      }
+    } catch {
+      // Continue
     }
     await waitForAudio(page)
 
@@ -238,7 +267,7 @@ Manufactured in India for export to European Union`
     // ==========================================
     console.log('📍 Scene 22: Duty Calculator')
     await highlightAndClick(page, 'text=Duty Calculator')
-    await page.waitForSelector('h1:has-text("Duty")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("Duty")')
     await waitForAudio(page)
 
     // ==========================================
@@ -264,7 +293,7 @@ Manufactured in India for export to European Union`
     // ==========================================
     console.log('📍 Scene 26: Denied Party Screening')
     await highlightAndClick(page, 'text=Denied Party')
-    await page.waitForSelector('h1:has-text("Denied Party")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("Denied Party")')
     await waitForAudio(page)
 
     // ==========================================
@@ -277,10 +306,14 @@ Manufactured in India for export to European Union`
     // SCENE 28: Real-Time Screening
     // ==========================================
     console.log('📍 Scene 28: Real-Time Screening')
-    const partyInput = page.locator('input').first()
-    if (await partyInput.isVisible()) {
-      await partyInput.click()
-      await page.keyboard.type('Volkov Trading LLC', { delay: 50 })
+    try {
+      const partyInput = page.locator('input').first()
+      if (await partyInput.isVisible()) {
+        await partyInput.click()
+        await page.keyboard.type('Volkov Trading LLC', { delay: 50 })
+      }
+    } catch {
+      // Continue
     }
     await waitForAudio(page)
 
@@ -288,9 +321,13 @@ Manufactured in India for export to European Union`
     // SCENE 29: Match Detection
     // ==========================================
     console.log('📍 Scene 29: Match Detection')
-    const screenButton = page.locator('button:has-text("Screen")').first()
-    if (await screenButton.isVisible()) {
-      await screenButton.click()
+    try {
+      const screenButton = page.locator('button:has-text("Screen")').first()
+      if (await screenButton.isVisible()) {
+        await screenButton.click()
+      }
+    } catch {
+      // Continue
     }
     await waitForAudio(page)
 
@@ -305,7 +342,7 @@ Manufactured in India for export to European Union`
     // ==========================================
     console.log('📍 Scene 31: Trade Documents')
     await highlightAndClick(page, 'text=Documents')
-    await page.waitForSelector('h1:has-text("Documents")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("Documents")')
     await waitForAudio(page)
 
     // ==========================================
@@ -319,7 +356,7 @@ Manufactured in India for export to European Union`
     // ==========================================
     console.log('📍 Scene 33: Compliance Management')
     await highlightAndClick(page, 'text=Compliance')
-    await page.waitForSelector('h1:has-text("Compliance")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("Compliance")')
     await waitForAudio(page)
 
     // ==========================================
@@ -333,7 +370,7 @@ Manufactured in India for export to European Union`
     // ==========================================
     console.log('📍 Scene 35: Complete Audit Trail')
     await highlightAndClick(page, 'text=Audit')
-    await page.waitForSelector('h1:has-text("Audit")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("Audit")')
     await waitForAudio(page)
 
     // ==========================================
@@ -341,16 +378,20 @@ Manufactured in India for export to European Union`
     // ==========================================
     console.log('📍 Scene 36: Team Management')
     await highlightAndClick(page, 'text=Settings')
-    await page.waitForSelector('h1:has-text("Settings")', { timeout: 10000 })
+    await safeWait(page, 'h1:has-text("Settings")')
     await waitForAudio(page)
 
     // ==========================================
     // SCENE 37: Role-Based Access Control
     // ==========================================
     console.log('📍 Scene 37: Role-Based Access Control')
-    const teamTab = page.locator('button:has-text("Team")')
-    if (await teamTab.isVisible()) {
-      await teamTab.click()
+    try {
+      const teamTab = page.locator('button:has-text("Team")')
+      if (await teamTab.isVisible()) {
+        await teamTab.click()
+      }
+    } catch {
+      // Continue
     }
     await waitForAudio(page)
 
@@ -377,7 +418,7 @@ Manufactured in India for export to European Union`
     // SCENE 41: Call to Action
     // ==========================================
     console.log('📍 Scene 41: Call to Action')
-    await waitForAudio(page, 2000) // Extra time for ending
+    await waitForAudio(page, 2000)
 
     console.log('\n🎬 Demo recording completed!')
     console.log(`📊 Total scenes: ${currentScene}`)
