@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, forwardRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { motion } from "framer-motion"
 import {
   Search,
   Bell,
@@ -21,14 +20,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
   Sheet,
   SheetContent,
   SheetTrigger,
@@ -36,41 +27,6 @@ import {
 import { Sidebar } from "./sidebar"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
-
-// Forward ref button for dropdown trigger
-const ProfileButton = forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement> & { initials: string }
->(({ initials, ...props }, ref) => (
-  <button
-    ref={ref}
-    className="inline-flex items-center justify-center rounded-full h-10 w-10 hover:bg-accent hover:text-accent-foreground transition-colors"
-    {...props}
-  >
-    <Avatar className="h-8 w-8">
-      <AvatarFallback className="bg-indigo-500/10 text-indigo-500 text-sm">
-        {initials}
-      </AvatarFallback>
-    </Avatar>
-  </button>
-))
-ProfileButton.displayName = "ProfileButton"
-
-// Forward ref button for mobile menu trigger
-const MobileMenuButton = forwardRef<
-  HTMLButtonElement,
-  React.ButtonHTMLAttributes<HTMLButtonElement>
->((props, ref) => (
-  <button
-    ref={ref}
-    className="inline-flex items-center justify-center rounded-md h-10 w-10 hover:bg-accent hover:text-accent-foreground transition-colors md:hidden"
-    {...props}
-  >
-    <Menu className="h-5 w-5" />
-    <span className="sr-only">Toggle menu</span>
-  </button>
-))
-MobileMenuButton.displayName = "MobileMenuButton"
 
 const pathNames: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -98,11 +54,11 @@ export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { theme, setTheme } = useTheme()
-  const [searchOpen, setSearchOpen] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   const currentPage = pathNames[pathname] || "Dashboard"
   const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"
-  const companyName = user?.user_metadata?.company_name || "TradeGuard"
   const initials = userName
     .split(" ")
     .map((n) => n[0])
@@ -110,7 +66,19 @@ export function Navbar({ user }: NavbarProps) {
     .toUpperCase()
     .slice(0, 2)
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
   const handleLogout = async () => {
+    setDropdownOpen(false)
     const supabase = createClient()
     await supabase.auth.signOut()
     toast.success("Logged out successfully")
@@ -122,7 +90,10 @@ export function Navbar({ user }: NavbarProps) {
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-card/80 backdrop-blur-sm px-4 md:px-6">
       {/* Mobile menu */}
       <Sheet>
-        <SheetTrigger render={<MobileMenuButton />} />
+        <SheetTrigger className="inline-flex items-center justify-center rounded-md h-10 w-10 hover:bg-accent hover:text-accent-foreground transition-colors md:hidden">
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Toggle menu</span>
+        </SheetTrigger>
         <SheetContent side="left" className="p-0 w-[260px]">
           <Sidebar user={user} />
         </SheetContent>
@@ -166,38 +137,62 @@ export function Navbar({ user }: NavbarProps) {
           <span className="sr-only">Toggle theme</span>
         </Button>
 
-        {/* User dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<ProfileButton initials={initials} />} />
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span>{userName}</span>
-                <span className="text-xs font-normal text-muted-foreground">
-                  {user?.email}
-                </span>
+        {/* User dropdown - custom implementation */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setDropdownOpen(!dropdownOpen)}
+            className="inline-flex items-center justify-center rounded-full h-10 w-10 hover:bg-accent hover:text-accent-foreground transition-colors"
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarFallback className="bg-indigo-500/10 text-indigo-500 text-sm">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+          </button>
+
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-56 rounded-lg bg-popover border border-border shadow-lg z-50 py-1 animate-in fade-in-0 zoom-in-95">
+              <div className="px-3 py-2 border-b border-border">
+                <p className="text-sm font-medium">{userName}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Building2 className="mr-2 h-4 w-4" />
-              Company Settings
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-red-500 focus:text-red-500">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+              <div className="py-1">
+                <button
+                  onClick={() => { setDropdownOpen(false); router.push("/dashboard/settings"); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors"
+                >
+                  <User className="h-4 w-4" />
+                  Profile
+                </button>
+                <button
+                  onClick={() => { setDropdownOpen(false); router.push("/dashboard/settings"); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors"
+                >
+                  <Building2 className="h-4 w-4" />
+                  Company Settings
+                </button>
+                <button
+                  onClick={() => { setDropdownOpen(false); router.push("/dashboard/settings"); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-accent transition-colors"
+                >
+                  <Settings className="h-4 w-4" />
+                  Settings
+                </button>
+              </div>
+
+              <div className="border-t border-border py-1">
+                <button
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-500/10 transition-colors"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )
