@@ -42,6 +42,40 @@ import { INCOTERMS, CURRENCIES, DUTY_RATES, FTA_AGREEMENTS } from "@/lib/constan
 import { createClient } from "@/lib/supabase/client"
 import type { DutyCalculation } from "@/lib/types"
 
+// WTO Customs Valuation Methods (Article VII of GATT)
+const WTO_VALUATION_METHODS = [
+  {
+    value: "transaction",
+    label: "Transaction Value",
+    description: "Price actually paid or payable for goods when sold for export",
+  },
+  {
+    value: "identical",
+    label: "Identical Goods",
+    description: "Transaction value of identical goods sold at the same commercial level",
+  },
+  {
+    value: "similar",
+    label: "Similar Goods",
+    description: "Transaction value of similar goods with comparable characteristics",
+  },
+  {
+    value: "deductive",
+    label: "Deductive Method",
+    description: "Based on unit price at which goods are sold in the importing country",
+  },
+  {
+    value: "computed",
+    label: "Computed Value",
+    description: "Based on cost of production plus profit and general expenses",
+  },
+  {
+    value: "fallback",
+    label: "Fall-back Method",
+    description: "Flexible application of previous methods with reasonable adjustments",
+  },
+]
+
 interface CalculationResult {
   declaredValue: number
   currency: string
@@ -55,6 +89,8 @@ interface CalculationResult {
   ftaName: string | null
   standardDutyRate: number
   savings: number
+  valuationMethod: string
+  adjustedValue: number
 }
 
 const container = {
@@ -77,6 +113,7 @@ export default function DutyCalculatorPage() {
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [showHistory, setShowHistory] = useState(false)
   const [formData, setFormData] = useState<DutyCalculateInput | null>(null)
+  const [valuationMethod, setValuationMethod] = useState("transaction")
 
   const {
     register,
@@ -148,13 +185,41 @@ export default function DutyCalculatorPage() {
       savings = (standardDutyRate - dutyRate) * data.declared_value / 100
     }
 
-    // Calculate amounts
-    const dutyAmount = (data.declared_value * dutyRate) / 100
-    const cifValue = data.declared_value + dutyAmount // Simplified CIF
-    const vatAmount = (cifValue * vatRate) / 100
-    const otherFees = Math.min(data.declared_value * 0.005, 500) // 0.5% up to $500
+    // Apply WTO Valuation Method adjustments
+    let adjustedValue = data.declared_value
+    switch (valuationMethod) {
+      case "transaction":
+        // Base transaction value - no adjustment
+        break
+      case "identical":
+        // Typically same as transaction for identical goods
+        adjustedValue = data.declared_value * 1.0
+        break
+      case "similar":
+        // Small adjustment for similar goods (typically 0-5% variance)
+        adjustedValue = data.declared_value * 1.02
+        break
+      case "deductive":
+        // Deduct profit margin and selling expenses (typically 15-25%)
+        adjustedValue = data.declared_value * 0.85
+        break
+      case "computed":
+        // Add production costs and profit (typically 5-15% higher)
+        adjustedValue = data.declared_value * 1.10
+        break
+      case "fallback":
+        // Flexible - use transaction with minor adjustment
+        adjustedValue = data.declared_value * 1.0
+        break
+    }
 
-    const totalLandedCost = data.declared_value + dutyAmount + vatAmount + otherFees
+    // Calculate amounts using adjusted value
+    const dutyAmount = (adjustedValue * dutyRate) / 100
+    const cifValue = adjustedValue + dutyAmount // Simplified CIF
+    const vatAmount = (cifValue * vatRate) / 100
+    const otherFees = Math.min(adjustedValue * 0.005, 500) // 0.5% up to $500
+
+    const totalLandedCost = adjustedValue + dutyAmount + vatAmount + otherFees
 
     return {
       declaredValue: data.declared_value,
@@ -169,6 +234,8 @@ export default function DutyCalculatorPage() {
       ftaName,
       standardDutyRate,
       savings,
+      valuationMethod,
+      adjustedValue,
     }
   }
 
@@ -398,20 +465,40 @@ export default function DutyCalculatorPage() {
                   </div>
                 </div>
 
-                {/* Incoterm */}
-                <div className="space-y-2">
-                  <Label htmlFor="incoterm">Incoterm</Label>
-                  <select
-                    id="incoterm"
-                    {...register("incoterm")}
-                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                  >
-                    {INCOTERMS.map((term) => (
-                      <option key={term} value={term}>
-                        {term}
-                      </option>
-                    ))}
-                  </select>
+                {/* Incoterm & Valuation Method */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="incoterm">Incoterm</Label>
+                    <select
+                      id="incoterm"
+                      {...register("incoterm")}
+                      className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      {INCOTERMS.map((term) => (
+                        <option key={term} value={term}>
+                          {term}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="valuation_method">
+                      WTO Valuation Method
+                      <span className="ml-1 text-xs text-muted-foreground">(Art. VII GATT)</span>
+                    </Label>
+                    <select
+                      id="valuation_method"
+                      value={valuationMethod}
+                      onChange={(e) => setValuationMethod(e.target.value)}
+                      className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                    >
+                      {WTO_VALUATION_METHODS.map((method) => (
+                        <option key={method.value} value={method.value}>
+                          {method.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <Button
@@ -498,6 +585,33 @@ export default function DutyCalculatorPage() {
                           />
                         </span>
                       </motion.div>
+
+                      {/* WTO Valuation Method */}
+                      {result.valuationMethod !== "transaction" && (
+                        <motion.div
+                          variants={item}
+                          className="flex items-center justify-between py-2 border-b border-border bg-amber-500/5"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Percent className="h-4 w-4 text-amber-500" />
+                            <span className="text-sm">
+                              Adjusted Value
+                              <Badge variant="outline" className="ml-2 text-xs bg-amber-500/10 text-amber-500 border-amber-500/20">
+                                {WTO_VALUATION_METHODS.find(m => m.value === result.valuationMethod)?.label}
+                              </Badge>
+                            </span>
+                          </div>
+                          <span className="font-medium text-amber-500">
+                            <CountUp
+                              end={result.adjustedValue}
+                              duration={1}
+                              prefix={getCurrencySymbol(result.currency)}
+                              decimals={2}
+                              separator=","
+                            />
+                          </span>
+                        </motion.div>
+                      )}
 
                       {/* Duty */}
                       <motion.div

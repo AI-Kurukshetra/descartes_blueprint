@@ -21,6 +21,10 @@ import {
   X,
   Loader2,
   CheckCircle,
+  History,
+  GitBranch,
+  Copy,
+  RotateCcw,
 } from "lucide-react"
 import { PageWrapper } from "@/components/shared/page-wrapper"
 import { EmptyState } from "@/components/shared/empty-state"
@@ -54,6 +58,15 @@ import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 import { format } from "date-fns"
 
+interface DocumentVersion {
+  version: number
+  content_json: Record<string, unknown>
+  status: string
+  created_at: string
+  created_by: string
+  change_notes: string
+}
+
 interface TradeDocument {
   id: string
   user_id: string
@@ -64,6 +77,8 @@ interface TradeDocument {
   content_json: Record<string, unknown>
   created_at: string
   updated_at: string
+  version: number
+  version_history: DocumentVersion[]
   shipment?: {
     reference_no: string
     product_name: string
@@ -142,6 +157,8 @@ export default function DocumentsPage() {
   const [selectedShipment, setSelectedShipment] = useState<string>("")
   const [generating, setGenerating] = useState(false)
   const [viewDocument, setViewDocument] = useState<TradeDocument | null>(null)
+  const [versionHistoryDoc, setVersionHistoryDoc] = useState<TradeDocument | null>(null)
+  const [creatingVersion, setCreatingVersion] = useState(false)
 
   const supabase = createClient()
 
@@ -225,6 +242,8 @@ export default function DocumentsPage() {
       doc_number: docNumber,
       status: "generated",
       content_json: contentJson,
+      version: 1,
+      version_history: [],
     })
 
     if (error) {
@@ -247,6 +266,83 @@ export default function DocumentsPage() {
     } else {
       toast.success("Document deleted")
       setDocuments((prev) => prev.filter((d) => d.id !== id))
+    }
+  }
+
+  async function createNewVersion(doc: TradeDocument, changeNotes: string = "Updated document") {
+    setCreatingVersion(true)
+
+    const { data: userData } = await supabase.auth.getUser()
+    const userName = userData.user?.email?.split("@")[0] || "Unknown"
+
+    // Create version entry for current state
+    const newVersionEntry: DocumentVersion = {
+      version: (doc.version || 1),
+      content_json: doc.content_json,
+      status: doc.status,
+      created_at: doc.updated_at || doc.created_at,
+      created_by: userName,
+      change_notes: changeNotes,
+    }
+
+    // Append to version history
+    const existingHistory = doc.version_history || []
+    const updatedHistory = [...existingHistory, newVersionEntry]
+
+    // Update document with new version
+    const { error } = await supabase
+      .from("trade_documents")
+      .update({
+        version: (doc.version || 1) + 1,
+        version_history: updatedHistory,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", doc.id)
+
+    if (error) {
+      toast.error("Failed to create new version")
+    } else {
+      toast.success(`Version ${(doc.version || 1) + 1} created`)
+      fetchDocuments()
+    }
+    setCreatingVersion(false)
+  }
+
+  async function restoreVersion(doc: TradeDocument, version: DocumentVersion) {
+    const { data: userData } = await supabase.auth.getUser()
+    const userName = userData.user?.email?.split("@")[0] || "Unknown"
+
+    // Create version entry for current state before restoring
+    const currentVersionEntry: DocumentVersion = {
+      version: doc.version || 1,
+      content_json: doc.content_json,
+      status: doc.status,
+      created_at: doc.updated_at || doc.created_at,
+      created_by: userName,
+      change_notes: `Before restoring to version ${version.version}`,
+    }
+
+    const existingHistory = doc.version_history || []
+    const updatedHistory = [...existingHistory, currentVersionEntry]
+
+    // Restore to selected version
+    const { error } = await supabase
+      .from("trade_documents")
+      .update({
+        content_json: version.content_json,
+        status: version.status,
+        version: (doc.version || 1) + 1,
+        version_history: updatedHistory,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", doc.id)
+
+    if (error) {
+      toast.error("Failed to restore version")
+    } else {
+      toast.success(`Restored to version ${version.version}`)
+      setVersionHistoryDoc(null)
+      fetchDocuments()
     }
   }
 
@@ -514,8 +610,9 @@ export default function DocumentsPage() {
                     <TableHead>Document</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Shipment</TableHead>
+                    <TableHead>Version</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>Updated</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -561,13 +658,27 @@ export default function DocumentsPage() {
                             )}
                           </TableCell>
                           <TableCell>
+                            <button
+                              onClick={() => setVersionHistoryDoc(doc)}
+                              className="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-muted transition-colors"
+                            >
+                              <GitBranch className="h-3 w-3 text-muted-foreground" />
+                              <span className="font-mono text-sm">v{doc.version || 1}</span>
+                              {(doc.version_history?.length || 0) > 0 && (
+                                <span className="text-xs text-muted-foreground">
+                                  ({doc.version_history.length} prev)
+                                </span>
+                              )}
+                            </button>
+                          </TableCell>
+                          <TableCell>
                             <div className="flex items-center gap-2">
                               {getStatusIcon(doc.status)}
                               <StatusBadge status={doc.status as "draft" | "generated" | "submitted" | "approved"} />
                             </div>
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {format(new Date(doc.created_at), "MMM dd, yyyy")}
+                            {format(new Date(doc.updated_at || doc.created_at), "MMM dd, yyyy")}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -575,10 +686,28 @@ export default function DocumentsPage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setViewDocument(doc)}
+                                title="View document"
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" onClick={() => downloadDocument(doc)}>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setVersionHistoryDoc(doc)}
+                                title="Version history"
+                              >
+                                <History className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => createNewVersion(doc)}
+                                disabled={creatingVersion}
+                                title="Create new version"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" onClick={() => downloadDocument(doc)} title="Download">
                                 <Download className="h-4 w-4" />
                               </Button>
                               <Button
@@ -586,6 +715,7 @@ export default function DocumentsPage() {
                                 size="icon"
                                 className="text-red-500 hover:text-red-600"
                                 onClick={() => deleteDocument(doc.id)}
+                                title="Delete"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -794,6 +924,121 @@ export default function DocumentsPage() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Version History Modal */}
+        <Dialog open={!!versionHistoryDoc} onOpenChange={() => setVersionHistoryDoc(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <GitBranch className="h-5 w-5 text-indigo-500" />
+                Version History
+              </DialogTitle>
+              <DialogDescription>
+                {versionHistoryDoc && (
+                  <>
+                    {getDocTypeInfo(versionHistoryDoc.doc_type).label} - {versionHistoryDoc.doc_number}
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {versionHistoryDoc && (
+              <div className="flex-1 overflow-y-auto space-y-4 py-4">
+                {/* Current Version */}
+                <div className="p-4 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500 text-white text-sm font-bold">
+                        v{versionHistoryDoc.version || 1}
+                      </div>
+                      <div>
+                        <p className="font-medium">Current Version</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(versionHistoryDoc.updated_at || versionHistoryDoc.created_at), "MMM dd, yyyy HH:mm")}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge status={versionHistoryDoc.status as "draft" | "generated" | "submitted" | "approved"} />
+                  </div>
+                </div>
+
+                {/* Version History */}
+                {versionHistoryDoc.version_history && versionHistoryDoc.version_history.length > 0 ? (
+                  <div className="space-y-3">
+                    <p className="text-sm font-medium text-muted-foreground">Previous Versions</p>
+                    {[...versionHistoryDoc.version_history].reverse().map((version, index) => (
+                      <motion.div
+                        key={index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="p-4 bg-muted/50 rounded-lg border border-border hover:border-indigo-500/30 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted border border-border text-sm font-mono">
+                              v{version.version}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">{version.change_notes}</p>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{format(new Date(version.created_at), "MMM dd, yyyy HH:mm")}</span>
+                                <span>by {version.created_by}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={version.status as "draft" | "generated" | "submitted" | "approved"} />
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => restoreVersion(versionHistoryDoc, version)}
+                              className="text-xs"
+                            >
+                              <RotateCcw className="h-3 w-3 mr-1" />
+                              Restore
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <History className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-sm text-muted-foreground">No previous versions</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This is the first version of the document
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-between gap-3 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => versionHistoryDoc && createNewVersion(versionHistoryDoc)}
+                disabled={creatingVersion}
+              >
+                {creatingVersion ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Create New Version
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => setVersionHistoryDoc(null)}>
+                Close
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

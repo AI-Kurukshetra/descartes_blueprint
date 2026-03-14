@@ -170,6 +170,41 @@ export interface User {
   created_at: string
 }
 
+// Role types
+export type UserRole = "admin" | "manager" | "analyst" | "viewer"
+export type ProfileStatus = "active" | "pending" | "inactive"
+
+// Profile type (for role-based access control)
+export interface Profile {
+  id: string
+  email: string
+  full_name: string | null
+  company_name: string | null
+  phone: string | null
+  timezone: string
+  role: UserRole
+  status: ProfileStatus
+  invited_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+// Role permissions mapping
+export const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
+  admin: ["all"],
+  manager: ["shipments", "documents", "products", "compliance", "team"],
+  analyst: ["shipments", "documents", "products", "reports", "hs-classifier", "duty-calculator"],
+  viewer: ["dashboard", "reports"],
+}
+
+// Role metadata
+export interface RoleInfo {
+  value: UserRole
+  label: string
+  description: string
+  color: string
+}
+
 // Denied Party (watchlist) types
 export interface DeniedParty {
   id: string
