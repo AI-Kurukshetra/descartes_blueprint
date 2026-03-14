@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
@@ -19,25 +19,46 @@ import {
   ChevronRight,
   LogOut,
   User,
+  Crown,
+  Briefcase,
+  LineChart,
+  Eye,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
+import { Permission, hasPermission } from "@/lib/permissions"
+import { UserRole } from "@/lib/types"
 
-const navItems = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Shipments", href: "/dashboard/shipments", icon: Package },
-  { name: "HS Classifier", href: "/dashboard/hs-classifier", icon: Cpu },
-  { name: "Duty Calculator", href: "/dashboard/duty-calculator", icon: Calculator },
-  { name: "Denied Party", href: "/dashboard/denied-party", icon: ShieldAlert },
-  { name: "Documents", href: "/dashboard/documents", icon: FileText },
-  { name: "Compliance", href: "/dashboard/compliance", icon: AlertTriangle },
-  { name: "Audit Log", href: "/dashboard/audit-log", icon: ScrollText },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ElementType
+  permission: Permission
+}
+
+const navItems: NavItem[] = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, permission: "dashboard.view" },
+  { name: "Shipments", href: "/dashboard/shipments", icon: Package, permission: "shipments.view" },
+  { name: "HS Classifier", href: "/dashboard/hs-classifier", icon: Cpu, permission: "hs_classifier.use" },
+  { name: "Duty Calculator", href: "/dashboard/duty-calculator", icon: Calculator, permission: "duty_calculator.use" },
+  { name: "Denied Party", href: "/dashboard/denied-party", icon: ShieldAlert, permission: "denied_party.use" },
+  { name: "Documents", href: "/dashboard/documents", icon: FileText, permission: "documents.view" },
+  { name: "Compliance", href: "/dashboard/compliance", icon: AlertTriangle, permission: "compliance.view" },
+  { name: "Audit Log", href: "/dashboard/audit-log", icon: ScrollText, permission: "audit_log.view" },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings, permission: "settings.view" },
 ]
+
+const ROLE_DISPLAY: Record<UserRole, { label: string; icon: React.ElementType; color: string }> = {
+  admin: { label: "Admin", icon: Crown, color: "text-amber-500" },
+  manager: { label: "Manager", icon: Briefcase, color: "text-indigo-500" },
+  analyst: { label: "Analyst", icon: LineChart, color: "text-emerald-500" },
+  viewer: { label: "Viewer", icon: Eye, color: "text-zinc-500" },
+}
 
 interface SidebarProps {
   user?: {
@@ -53,6 +74,35 @@ export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [userRole, setUserRole] = useState<UserRole | null>(null)
+
+  // Fetch user role on mount
+  useEffect(() => {
+    async function fetchRole() {
+      const supabase = createClient()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", authUser.id)
+          .single()
+
+        if (profile?.role) {
+          setUserRole(profile.role as UserRole)
+        } else {
+          setUserRole("admin") // Default to admin for demo
+        }
+      }
+    }
+    fetchRole()
+  }, [])
+
+  // Filter nav items based on user role
+  const filteredNavItems = navItems.filter(item =>
+    hasPermission(userRole, item.permission)
+  )
 
   const handleLogout = async () => {
     const supabase = createClient()
@@ -70,6 +120,9 @@ export function Sidebar({ user }: SidebarProps) {
     .join("")
     .toUpperCase()
     .slice(0, 2)
+
+  const roleInfo = userRole ? ROLE_DISPLAY[userRole] : null
+  const RoleIcon = roleInfo?.icon
 
   return (
     <motion.aside
@@ -103,7 +156,7 @@ export function Sidebar({ user }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-2">
         <ul className="space-y-1">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const isActive = pathname === item.href
             const Icon = item.icon
 
@@ -188,9 +241,14 @@ export function Sidebar({ user }: SidebarProps) {
                   className="flex flex-col min-w-0"
                 >
                   <span className="text-sm font-medium truncate">{userName}</span>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {companyName}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {roleInfo && RoleIcon && (
+                      <span className={cn("flex items-center gap-1 text-xs", roleInfo.color)}>
+                        <RoleIcon className="h-3 w-3" />
+                        {roleInfo.label}
+                      </span>
+                    )}
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -222,13 +280,40 @@ export function Sidebar({ user }: SidebarProps) {
 // Mobile bottom navigation
 export function MobileNav() {
   const pathname = usePathname()
+  const [userRole, setUserRole] = useState<UserRole | null>(null)
 
-  const mobileNavItems = navItems.slice(0, 5) // Show first 5 items
+  // Fetch user role on mount
+  useEffect(() => {
+    async function fetchRole() {
+      const supabase = createClient()
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+
+      if (authUser) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", authUser.id)
+          .single()
+
+        if (profile?.role) {
+          setUserRole(profile.role as UserRole)
+        } else {
+          setUserRole("admin") // Default to admin for demo
+        }
+      }
+    }
+    fetchRole()
+  }, [])
+
+  // Filter nav items based on user role, then take first 5
+  const filteredNavItems = navItems
+    .filter(item => hasPermission(userRole, item.permission))
+    .slice(0, 5)
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border">
       <div className="flex items-center justify-around h-16">
-        {mobileNavItems.map((item) => {
+        {filteredNavItems.map((item) => {
           const isActive = pathname === item.href
           const Icon = item.icon
 
