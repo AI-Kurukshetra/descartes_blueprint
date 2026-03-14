@@ -37,6 +37,14 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Local planning documents
+CLAUDE.md
+CLAUDE_CODE_SETUP.md
+BATTLE_PLAN.md
+MASTER_PROMPTS.md
+UI_UX_EXCELLENCE.md
+VIDEO_AND_PH_KIT.md
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
