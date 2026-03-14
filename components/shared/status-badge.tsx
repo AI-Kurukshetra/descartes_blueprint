@@ -104,9 +104,10 @@ const statusConfig: Record<
 interface StatusBadgeProps {
   status: StatusType
   className?: string
+  variant?: "shipment" | "compliance" | "document" | "screening" | "classification"
 }
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, className, variant }: StatusBadgeProps) {
   const config = statusConfig[status] || {
     label: status,
     className: "bg-zinc-500/10 text-zinc-500 border-zinc-500/20",

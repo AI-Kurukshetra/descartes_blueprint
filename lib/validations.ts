@@ -10,7 +10,7 @@ export const createShipmentSchema = z.object({
   product_name: z.string().min(1, "Product name is required"),
   hs_code: z.string().optional(),
   declared_value: z.number().positive("Declared value must be positive"),
-  currency: z.string().default("USD"),
+  currency: z.string().min(1, "Currency is required"),
   weight_kg: z.number().positive("Weight must be positive"),
   incoterm: z.string().min(1, "Incoterm is required"),
   customs_broker: z.string().optional(),
