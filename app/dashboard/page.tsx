@@ -27,6 +27,7 @@ import { StatusBadge } from "@/components/shared/status-badge"
 import { RouteDisplay } from "@/components/shared/country-flag"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -37,14 +38,16 @@ import {
 } from "@/components/ui/table"
 import { format, subDays } from "date-fns"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
+import type { Shipment } from "@/lib/types"
 
-// Generate 30 days of shipment data
+// Generate 30 days of shipment data for chart
 const generateChartData = () => {
   const data = []
   for (let i = 29; i >= 0; i--) {
     const date = subDays(new Date(), i)
     const isWeekend = date.getDay() === 0 || date.getDay() === 6
-    const baseShipments = 80 + Math.floor((29 - i) * 2.1) // Growth from 80 to ~142
+    const baseShipments = 80 + Math.floor((29 - i) * 2.1)
     const variation = Math.floor(Math.random() * 15) - 7
     const weekendDip = isWeekend ? -20 : 0
     const shipments = Math.max(60, baseShipments + variation + weekendDip)
@@ -58,93 +61,6 @@ const generateChartData = () => {
   }
   return data
 }
-
-const chartData = generateChartData()
-
-// Duty by country data
-const dutyByCountry = [
-  { country: "USA", amount: 245000 },
-  { country: "Germany", amount: 189000 },
-  { country: "UAE", amount: 156000 },
-  { country: "UK", amount: 134000 },
-  { country: "Singapore", amount: 98000 },
-]
-
-// Recent shipments mock data
-const recentShipments = [
-  {
-    id: "1",
-    reference: "TG-2026-00142",
-    origin: "IN",
-    destination: "US",
-    status: "in_transit" as const,
-    value: "$45,000",
-    date: "Mar 14, 2026",
-  },
-  {
-    id: "2",
-    reference: "TG-2026-00141",
-    origin: "IN",
-    destination: "DE",
-    status: "pending_clearance" as const,
-    value: "$32,500",
-    date: "Mar 13, 2026",
-  },
-  {
-    id: "3",
-    reference: "TG-2026-00140",
-    origin: "CN",
-    destination: "IN",
-    status: "cleared" as const,
-    value: "$78,200",
-    date: "Mar 13, 2026",
-  },
-  {
-    id: "4",
-    reference: "TG-2026-00139",
-    origin: "IN",
-    destination: "AE",
-    status: "delivered" as const,
-    value: "$125,000",
-    date: "Mar 12, 2026",
-  },
-  {
-    id: "5",
-    reference: "TG-2026-00138",
-    origin: "IN",
-    destination: "GB",
-    status: "flagged" as const,
-    value: "$56,800",
-    date: "Mar 12, 2026",
-  },
-  {
-    id: "6",
-    reference: "TG-2026-00137",
-    origin: "IN",
-    destination: "SG",
-    status: "cleared" as const,
-    value: "$89,400",
-    date: "Mar 11, 2026",
-  },
-  {
-    id: "7",
-    reference: "TG-2026-00136",
-    origin: "IN",
-    destination: "JP",
-    status: "in_transit" as const,
-    value: "$67,200",
-    date: "Mar 11, 2026",
-  },
-  {
-    id: "8",
-    reference: "TG-2026-00135",
-    origin: "IN",
-    destination: "US",
-    status: "delivered" as const,
-    value: "$234,500",
-    date: "Mar 10, 2026",
-  },
-]
 
 const container = {
   hidden: { opacity: 0 },
@@ -161,10 +77,97 @@ const item = {
 
 export default function DashboardPage() {
   const [mounted, setMounted] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [shipments, setShipments] = useState<Shipment[]>([])
+  const [stats, setStats] = useState({
+    totalShipments: 0,
+    complianceRate: 0,
+    dutySavings: 0,
+    openExceptions: 0,
+  })
+  const [dutyByCountry, setDutyByCountry] = useState<{ country: string; amount: number }[]>([])
+  const [chartData] = useState(generateChartData())
 
   useEffect(() => {
     setMounted(true)
+    fetchDashboardData()
   }, [])
+
+  async function fetchDashboardData() {
+    const supabase = createClient()
+
+    // Fetch recent shipments
+    const { data: shipmentsData } = await supabase
+      .from("shipments")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(8)
+
+    if (shipmentsData) {
+      setShipments(shipmentsData)
+    }
+
+    // Fetch all shipments for stats
+    const { data: allShipments } = await supabase
+      .from("shipments")
+      .select("*")
+
+    if (allShipments) {
+      const total = allShipments.length
+      const compliant = allShipments.filter(s => s.compliance_status === "compliant").length
+      const complianceRate = total > 0 ? (compliant / total) * 100 : 0
+
+      // Calculate duty by country
+      const dutyMap: Record<string, number> = {}
+      allShipments.forEach(s => {
+        const country = s.destination_country
+        dutyMap[country] = (dutyMap[country] || 0) + Number(s.duty_amount || 0)
+      })
+      const dutyData = Object.entries(dutyMap)
+        .map(([country, amount]) => ({ country, amount }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5)
+
+      setDutyByCountry(dutyData)
+      setStats(prev => ({
+        ...prev,
+        totalShipments: total,
+        complianceRate: Math.round(complianceRate * 10) / 10,
+      }))
+    }
+
+    // Fetch duty calculations for savings
+    const { data: dutyCalcs } = await supabase
+      .from("duty_calculations")
+      .select("savings_vs_standard")
+      .not("savings_vs_standard", "is", null)
+
+    if (dutyCalcs) {
+      const totalSavings = dutyCalcs.reduce((sum, d) => sum + Number(d.savings_vs_standard || 0), 0)
+      setStats(prev => ({ ...prev, dutySavings: totalSavings }))
+    }
+
+    // Fetch open exceptions
+    const { data: exceptions } = await supabase
+      .from("compliance_exceptions")
+      .select("id")
+      .in("status", ["open", "in_review"])
+
+    if (exceptions) {
+      setStats(prev => ({ ...prev, openExceptions: exceptions.length }))
+    }
+
+    setLoading(false)
+  }
+
+  const formatCurrency = (value: number, currency: string = "USD") => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value)
+  }
 
   return (
     <PageWrapper>
@@ -181,14 +184,14 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             title="Shipments This Month"
-            value={142}
+            value={loading ? 0 : stats.totalShipments}
             icon={Package}
             trend={{ value: 12, label: "vs last month", isPositive: true }}
             index={0}
           />
           <StatCard
             title="Compliance Rate"
-            value={94.2}
+            value={loading ? 0 : stats.complianceRate}
             suffix="%"
             decimals={1}
             icon={ShieldCheck}
@@ -197,8 +200,8 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Duty Savings (FTA)"
-            value={842000}
-            prefix="₹"
+            value={loading ? 0 : stats.dutySavings}
+            prefix="$"
             separator=","
             icon={TrendingDown}
             trend={{ value: 23, label: "vs last month", isPositive: true }}
@@ -206,7 +209,7 @@ export default function DashboardPage() {
           />
           <StatCard
             title="Open Exceptions"
-            value={7}
+            value={loading ? 0 : stats.openExceptions}
             icon={AlertTriangle}
             trend={{ value: -3, label: "vs last week", isPositive: false }}
             index={3}
@@ -299,7 +302,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="h-[280px]">
-                  {mounted && (
+                  {mounted && dutyByCountry.length > 0 && (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={dutyByCountry} layout="vertical">
                       <CartesianGrid
@@ -314,7 +317,7 @@ export default function DashboardPage() {
                         className="text-muted-foreground"
                         tickLine={false}
                         axisLine={false}
-                        tickFormatter={(value) => `₹${(value / 1000).toFixed(0)}K`}
+                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}K`}
                       />
                       <YAxis
                         type="category"
@@ -332,7 +335,7 @@ export default function DashboardPage() {
                           borderRadius: "8px",
                         }}
                         formatter={(value) => [
-                          `₹${Number(value).toLocaleString()}`,
+                          `$${Number(value).toLocaleString()}`,
                           "Duty Amount",
                         ]}
                       />
@@ -344,6 +347,11 @@ export default function DashboardPage() {
                       />
                     </BarChart>
                   </ResponsiveContainer>
+                  )}
+                  {mounted && dutyByCountry.length === 0 && !loading && (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      No duty data available
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -369,48 +377,65 @@ export default function DashboardPage() {
                 </Link>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Reference</TableHead>
-                      <TableHead>Route</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Value</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <motion.tbody
-                      variants={container}
-                      initial="hidden"
-                      animate="show"
-                      className="contents"
-                    >
-                      {recentShipments.map((shipment) => (
-                        <motion.tr
-                          key={shipment.id}
-                          variants={item}
-                          className="group border-b border-border/50 hover:bg-muted/50 transition-colors"
-                        >
-                          <TableCell className="font-mono text-sm text-indigo-500">
-                            {shipment.reference}
-                          </TableCell>
-                          <TableCell>
-                            <RouteDisplay
-                              origin={shipment.origin}
-                              destination={shipment.destination}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={shipment.status} />
-                          </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {shipment.value}
-                          </TableCell>
-                        </motion.tr>
-                      ))}
-                    </motion.tbody>
-                  </TableBody>
-                </Table>
+                {loading ? (
+                  <div className="space-y-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="flex gap-4">
+                        <Skeleton className="h-4 w-28" />
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-16" />
+                        <Skeleton className="h-4 w-20 ml-auto" />
+                      </div>
+                    ))}
+                  </div>
+                ) : shipments.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No shipments yet
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reference</TableHead>
+                        <TableHead>Route</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Value</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <motion.tbody
+                        variants={container}
+                        initial="hidden"
+                        animate="show"
+                        className="contents"
+                      >
+                        {shipments.map((shipment) => (
+                          <motion.tr
+                            key={shipment.id}
+                            variants={item}
+                            className="group border-b border-border/50 hover:bg-muted/50 transition-colors"
+                          >
+                            <TableCell className="font-mono text-sm text-indigo-500">
+                              {shipment.reference_no}
+                            </TableCell>
+                            <TableCell>
+                              <RouteDisplay
+                                origin={shipment.origin_country}
+                                destination={shipment.destination_country}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <StatusBadge status={shipment.status as "in_transit" | "pending_clearance" | "cleared" | "flagged" | "delivered"} />
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {formatCurrency(Number(shipment.declared_value), shipment.currency)}
+                            </TableCell>
+                          </motion.tr>
+                        ))}
+                      </motion.tbody>
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
           </motion.div>

@@ -17,7 +17,6 @@ import {
 import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Sheet,
@@ -25,6 +24,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { Sidebar } from "./sidebar"
+import { SearchDialog } from "@/components/shared/search-dialog"
 import { createClient } from "@/lib/supabase/client"
 import { toast } from "sonner"
 
@@ -55,6 +55,7 @@ export function Navbar({ user }: NavbarProps) {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const currentPage = pathNames[pathname] || "Dashboard"
@@ -75,6 +76,18 @@ export function Navbar({ user }: NavbarProps) {
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // Cmd+K / Ctrl+K shortcut for search
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
+        event.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
   }, [])
 
   const handleLogout = async () => {
@@ -108,14 +121,20 @@ export function Navbar({ user }: NavbarProps) {
 
       {/* Search */}
       <div className="flex-1 max-w-md ml-auto mr-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search... (Cmd+K)"
-            className="pl-9 bg-muted/50 border-transparent focus:border-border"
-          />
-        </div>
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-muted/50 text-muted-foreground text-sm hover:bg-muted transition-colors"
+        >
+          <Search className="h-4 w-4" />
+          <span className="hidden sm:inline">Search...</span>
+          <kbd className="hidden sm:inline-flex ml-auto px-1.5 py-0.5 rounded bg-muted border border-border text-[10px]">
+            ⌘K
+          </kbd>
+        </button>
       </div>
+
+      {/* Search Dialog */}
+      <SearchDialog open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* Actions */}
       <div className="flex items-center gap-2">

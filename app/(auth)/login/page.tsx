@@ -98,7 +98,7 @@ export default function LoginPage() {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="demo@tradeguard.com"
+                  placeholder="Enter your email"
                   {...register("email")}
                   className={errors.email ? "border-red-500" : ""}
                 />
@@ -160,13 +160,6 @@ export default function LoginPage() {
               >
                 Sign up
               </Link>
-            </div>
-
-            <div className="mt-4 p-3 rounded-lg bg-muted/50 text-center">
-              <p className="text-xs text-muted-foreground">
-                Demo: <span className="font-mono">demo@tradeguard.com</span> /{" "}
-                <span className="font-mono">demo1234</span>
-              </p>
             </div>
           </CardContent>
         </Card>
