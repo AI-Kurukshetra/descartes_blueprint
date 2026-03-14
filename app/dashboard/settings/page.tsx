@@ -417,9 +417,43 @@ export default function SettingsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-4 mb-4">
-                  <span className="text-sm text-muted-foreground">Your Role:</span>
-                  {currentUser && getRoleBadge(currentUser.role)}
+                <div className="flex items-center justify-between mb-4 p-3 bg-muted/30 rounded-lg">
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-muted-foreground">Your Role:</span>
+                    {currentUser && getRoleBadge(currentUser.role)}
+                  </div>
+                  {/* DEV ONLY: Role Switcher for Testing */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-amber-500 font-medium">DEV:</span>
+                    <Select
+                      value={currentUser?.role || "admin"}
+                      onValueChange={async (value) => {
+                        if (!currentUser) return
+                        try {
+                          const { error } = await supabase
+                            .from("profiles")
+                            .update({ role: value as UserRole })
+                            .eq("id", currentUser.id)
+                          if (error) throw error
+                          setCurrentUser({ ...currentUser, role: value as UserRole })
+                          toast.success(`Role changed to ${value}. Refresh to see navigation changes.`)
+                        } catch (err) {
+                          toast.error("Failed to update role")
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="w-[140px] h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ROLES.map((role) => (
+                          <SelectItem key={role.value} value={role.value}>
+                            {role.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
