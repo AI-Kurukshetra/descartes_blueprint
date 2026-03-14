@@ -21,10 +21,16 @@ type StatusType =
   | "possible_match"
   | "accepted"
   | "rejected"
+  // Risk levels
+  | "none"
+  | "low"
+  | "medium"
+  | "high"
+  | "critical"
 
 const statusConfig: Record<
   StatusType,
-  { label: string; className: string }
+  { label: string; className: string; pulse?: boolean }
 > = {
   // Shipment statuses
   in_transit: {
@@ -99,12 +105,34 @@ const statusConfig: Record<
     label: "Rejected",
     className: "bg-red-500/10 text-red-500 border-red-500/20",
   },
+  // Risk levels
+  none: {
+    label: "None",
+    className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+  },
+  low: {
+    label: "Low",
+    className: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
+  },
+  medium: {
+    label: "Medium",
+    className: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  },
+  high: {
+    label: "High",
+    className: "bg-red-500/10 text-red-500 border-red-500/20",
+  },
+  critical: {
+    label: "Critical",
+    className: "bg-red-500/10 text-red-500 border-red-500/20 animate-pulse",
+    pulse: true,
+  },
 }
 
 interface StatusBadgeProps {
   status: StatusType
   className?: string
-  variant?: "shipment" | "compliance" | "document" | "screening" | "classification"
+  variant?: "shipment" | "compliance" | "document" | "screening" | "classification" | "risk"
 }
 
 export function StatusBadge({ status, className, variant }: StatusBadgeProps) {

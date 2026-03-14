@@ -65,7 +65,7 @@ export type DutyCalculateInput = z.infer<typeof dutyCalculateSchema>
 export const screenPartySchema = z.object({
   party_name: z.string().min(2, "Party name is required"),
   party_country: z.string().optional(),
-  search_type: z.enum(["company", "individual"]).default("company"),
+  search_type: z.enum(["company", "individual"]),
 })
 
 export type ScreenPartyInput = z.infer<typeof screenPartySchema>
