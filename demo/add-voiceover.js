@@ -97,11 +97,12 @@ async function main() {
 
   const openai = new OpenAI({ apiKey })
 
-  // Find the latest MP4 video
+  // Find the latest MP4 video (by modification time)
   const mp4Files = fs.readdirSync(OUTPUT_DIR)
     .filter(f => f.endsWith('.mp4') && !f.includes('-with-voiceover'))
-    .sort()
-    .reverse()
+    .map(f => ({ name: f, mtime: fs.statSync(path.join(OUTPUT_DIR, f)).mtime }))
+    .sort((a, b) => b.mtime - a.mtime)
+    .map(f => f.name)
 
   if (mp4Files.length === 0) {
     console.error('❌ No MP4 video found in demo/output/')
