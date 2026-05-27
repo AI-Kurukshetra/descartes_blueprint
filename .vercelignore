@@ -1,0 +1,6 @@
+demo/videos/
+demo/output/
+demo/audio/
+playwright-report/
+.next/
+node_modules/

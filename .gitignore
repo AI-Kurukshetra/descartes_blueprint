@@ -45,6 +45,9 @@ MASTER_PROMPTS.md
 UI_UX_EXCELLENCE.md
 VIDEO_AND_PH_KIT.md
 
+# IDE
+.idea/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
